@@ -282,7 +282,7 @@ async function saveMenuEntry(entryId: string): Promise<void> {
   }
 
   statusVariant.value = 'success';
-  statusMessage.value = isDividerDraft(normalized) ? 'Divider saved.' : `Saved entry "${persisted.label}".`;
+  statusMessage.value = isDividerDraft(normalized) ? 'Divider saved.' : `Saved item "${persisted.label}".`;
 }
 
 async function saveWorkflowRule(ruleId: string): Promise<void> {
@@ -322,7 +322,7 @@ async function saveWorkflowRule(ruleId: string): Promise<void> {
   }
 
   statusVariant.value = 'success';
-  statusMessage.value = `Saved workflow rule "${persisted.name}".`;
+  statusMessage.value = `Saved workflow "${persisted.name}".`;
 }
 
 async function removeMenuEntry(entryId: string): Promise<void> {
@@ -333,7 +333,7 @@ async function removeMenuEntry(entryId: string): Promise<void> {
   if (next.length !== saved.length) {
     await saveMenuEntries(next);
     statusVariant.value = 'success';
-    statusMessage.value = 'Entry removed.';
+    statusMessage.value = 'Item removed.';
   } else {
     clearStatus();
   }
@@ -354,7 +354,7 @@ async function removeWorkflowRule(ruleId: string): Promise<void> {
   );
   await Promise.all([saveWorkflowRules(nextRules), saveMenuEntries(nextEntries)]);
   statusVariant.value = 'success';
-  statusMessage.value = 'Workflow rule removed.';
+  statusMessage.value = 'Workflow removed.';
 }
 
 function toggleMenuEntry(id: string): void {
@@ -404,7 +404,7 @@ function isDividerDraft(entry: EditableMenuEntry): boolean {
 }
 
 function entryTitle(entry: EditableMenuEntry): string {
-  return isDividerDraft(entry) ? 'Divider' : entry.label.trim() || 'Untitled entry';
+  return isDividerDraft(entry) ? 'Divider' : entry.label.trim() || 'Untitled item';
 }
 
 function entrySummary(entry: EditableMenuEntry): string {
@@ -413,11 +413,11 @@ function entrySummary(entry: EditableMenuEntry): string {
   }
 
   const workflow = workflowRules.value.find((rule) => rule.id === entry.workflowRuleId);
-  return workflow ? `Uses workflow · ${workflow.name}` : 'No linked workflow rule';
+  return workflow ? `Uses workflow · ${workflow.name}` : 'No linked workflow';
 }
 
 function workflowTitle(rule: EditableWorkflowRule): string {
-  return rule.name.trim() || 'Untitled workflow rule';
+  return rule.name.trim() || 'Untitled workflow';
 }
 
 function workflowSummary(rule: EditableWorkflowRule): string {
@@ -467,7 +467,7 @@ function validateLinkedWorkflow(entry: EditableMenuEntry): string | null {
   }
 
   if (!entry.workflowRuleId) {
-    return 'Select a workflow rule for this entry.';
+    return 'Select a workflow for this item.';
   }
 
   return null;
@@ -553,7 +553,7 @@ async function importConfiguration(event: Event): Promise<void> {
     openMatcherIds.value = [];
     settings.value = normalizedSettings;
     statusVariant.value = 'success';
-    statusMessage.value = `Imported ${normalizedEntries.length} entr${normalizedEntries.length === 1 ? 'y' : 'ies'} and ${normalizedRules.length} workflow rule${normalizedRules.length === 1 ? '' : 's'}.`;
+    statusMessage.value = `Imported ${normalizedEntries.length} item${normalizedEntries.length === 1 ? '' : 's'} and ${normalizedRules.length} workflow${normalizedRules.length === 1 ? '' : 's'}.`;
   } catch (error) {
     statusVariant.value = 'error';
     statusMessage.value = error instanceof Error ? `Import failed: ${error.message}` : 'Import failed.';
@@ -584,14 +584,14 @@ function clearStatus(): void {
           </div>
           <h1 class="page-title">Save In MV3</h1>
           <p class="page-copy">
-            Manage context menu entries and workflow rules for downloads routed inside your Downloads folder.
+            Manage workflows and context menu items for downloads routed inside your Downloads folder.
           </p>
         </div>
         <div class="top-actions">
           <button class="secondary-button" type="button" @click="addDividerEntry()">Add divider</button>
           <button class="primary-button top-action" type="button" @click="addMenuEntry()">
             <span class="button-plus">+</span>
-            Add context menu entry
+            Add context menu item
           </button>
         </div>
       </div>
@@ -599,112 +599,45 @@ function clearStatus(): void {
 
     <main class="page-main split-page-main">
       <div class="main-column-stack">
-        <section class="card panel-rules">
-          <div class="card-header">
-            <h2>Context menu entries</h2>
-            <p>
-              These are the visible items that appear in the regular page, link, media, and selection context menus.
-              Entries can point at workflow rules, and dividers can be inserted between them.
-            </p>
+        <section class="card intro-card">
+          <div class="card-header compact">
+            <h2>How it works</h2>
+            <p>Set up downloads in this order so each step builds on the previous one.</p>
           </div>
 
-          <div class="rule-list">
-            <div v-for="entry in menuEntries" :key="entry.id" class="rule-wrap">
-              <article class="rule-card" :class="{ 'is-open': isMenuEntryOpen(entry.id) }">
-                <div class="rule-card__summary" @click="toggleMenuEntry(entry.id)">
-                  <div class="rule-card__bar" :class="{ active: isMenuEntryOpen(entry.id) }"></div>
-                  <div class="rule-card__copy">
-                    <div class="rule-card__topline">
-                      <span class="rule-title">{{ entryTitle(entry) }}</span>
-                      <span class="rule-badge">Group · {{ entry.menuPath?.trim() || 'Root' }}</span>
-                      <span class="rule-badge muted">{{ isDividerDraft(entry) ? 'Divider' : 'Visible entry' }}</span>
-                    </div>
-                    <div class="rule-meta">
-                      {{ entrySummary(entry) }}
-                    </div>
-                  </div>
-                  <span class="chevron">{{ isMenuEntryOpen(entry.id) ? '▲' : '▼' }}</span>
-                </div>
-
-                <div v-if="isMenuEntryOpen(entry.id)" class="rule-editor">
-                  <div class="editor-grid">
-                    <label class="field">
-                      <span>Entry type</span>
-                      <div class="select-wrap">
-                        <select v-model="entry.kind" @change="onEdit">
-                          <option value="entry">Context menu entry</option>
-                          <option value="divider">Divider</option>
-                        </select>
-                        <span class="select-caret">▼</span>
-                      </div>
-                    </label>
-
-                    <label class="field">
-                      <span>Menu group</span>
-                      <input v-model="entry.menuPath" type="text" placeholder="Research/Clippings" @input="onEdit" />
-                      <small class="field-help">Optional nested group path using <code>/</code>.</small>
-                      <small v-if="menuPathError(entry)" class="field-error">{{ menuPathError(entry) }}</small>
-                    </label>
-                  </div>
-
-                  <template v-if="!isDividerDraft(entry)">
-                    <label class="field">
-                      <span>Context menu label</span>
-                      <input v-model="entry.label" type="text" placeholder="Articles" @input="onEdit" />
-                      <small v-if="menuLabelError(entry)" class="field-error">{{ menuLabelError(entry) }}</small>
-                    </label>
-
-                    <label class="field">
-                      <span>Workflow rule</span>
-                      <div class="select-wrap">
-                        <select v-model="entry.workflowRuleId" @change="onEdit">
-                          <option :value="null">Select workflow rule</option>
-                          <option v-for="rule in workflowRules" :key="rule.id" :value="rule.id">
-                            {{ workflowTitle(rule) }}
-                          </option>
-                        </select>
-                        <span class="select-caret">▼</span>
-                      </div>
-                      <small v-if="linkedWorkflowError(entry)" class="field-error">{{ linkedWorkflowError(entry) }}</small>
-                    </label>
-                  </template>
-
-                  <div v-else class="divider-help">
-                    This entry creates a non-clickable separator in the generated context menu.
-                  </div>
-
-                  <div class="rule-actions rule-actions--right-only">
-                    <div class="rule-actions__right">
-                      <button class="danger-button" type="button" @click="void removeMenuEntry(entry.id)">
-                        Remove entry
-                      </button>
-                      <button class="primary-button" type="button" @click="void saveMenuEntry(entry.id)">
-                        Save entry
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
+          <div class="intro-steps">
+            <div class="intro-step">
+              <div class="intro-step__number">1</div>
+              <div class="intro-step__copy">
+                <strong>Create a workflow</strong>
+                <span>Define the relative download path, filename template, shortcut output, and optional auto-match fields.</span>
+              </div>
             </div>
 
-            <div class="list-add-actions">
-              <button class="add-more-button" type="button" @click="addMenuEntry()">
-                <span class="button-plus">+</span>
-                Add context menu entry
-              </button>
-              <button class="add-more-button secondary-add" type="button" @click="addDividerEntry()">
-                Add divider
-              </button>
+            <div class="intro-step">
+              <div class="intro-step__number">2</div>
+              <div class="intro-step__copy">
+                <strong>Add a context menu item</strong>
+                <span>Create an optional menu shortcut that runs one of your workflows, or insert dividers to organize items.</span>
+              </div>
+            </div>
+
+            <div class="intro-step">
+              <div class="intro-step__number">3</div>
+              <div class="intro-step__copy">
+                <strong>Adjust behavior and save</strong>
+                <span>Fine-tune global behavior, tab-save options, and import/export settings from the sidebar.</span>
+              </div>
             </div>
           </div>
         </section>
 
         <section class="card panel-rules">
           <div class="card-header">
-            <h2>Workflow rules</h2>
+            <h2>Workflows</h2>
             <p>
-              These rules define matching, path routing, filename templating, and shortcut output behavior.
-              Auto-only workflows such as tab saves use this rule set directly.
+              These workflows define matching, path routing, filename templating, and shortcut output behavior.
+              Auto-only workflows such as tab saves use this set directly.
             </p>
           </div>
 
@@ -726,7 +659,7 @@ function clearStatus(): void {
 
                 <div v-if="isWorkflowRuleOpen(rule.id)" class="rule-editor">
                   <label class="field">
-                    <span>Workflow rule name</span>
+                    <span>Workflow name</span>
                     <input v-model="rule.name" type="text" placeholder="Saved Tabs" @input="onEdit" />
                     <small v-if="workflowNameError(rule)" class="field-error">{{ workflowNameError(rule) }}</small>
                   </label>
@@ -771,7 +704,7 @@ function clearStatus(): void {
                     </button>
                     <p class="matcher-intro">
                       Fill one or more matcher fields to make this workflow eligible for
-                      <strong>Best matching rule</strong> and popup tab-save actions.
+                      <strong>Best matching workflow</strong> and popup tab-save actions.
                     </p>
 
                     <div v-if="areMatchersOpen(rule.id)" class="matcher-fields">
@@ -835,7 +768,96 @@ function clearStatus(): void {
             <div class="list-add-actions single-action">
               <button class="add-more-button" type="button" @click="addWorkflowRule()">
                 <span class="button-plus">+</span>
-                Add workflow rule
+                Add workflow
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card panel-rules">
+          <div class="card-header">
+            <h2>Context menu items</h2>
+            <p>
+              These are the visible items that appear in the regular page, link, media, and selection context menus.
+              Items can point at workflows, and dividers can be inserted between them.
+            </p>
+          </div>
+
+          <div class="rule-list">
+            <div v-for="entry in menuEntries" :key="entry.id" class="rule-wrap">
+              <article class="rule-card" :class="{ 'is-open': isMenuEntryOpen(entry.id) }">
+                <div class="rule-card__summary" @click="toggleMenuEntry(entry.id)">
+                  <div class="rule-card__bar" :class="{ active: isMenuEntryOpen(entry.id) }"></div>
+                  <div class="rule-card__copy">
+                    <div class="rule-card__topline">
+                      <span class="rule-title">{{ entryTitle(entry) }}</span>
+                      <span class="rule-badge">Group · {{ entry.menuPath?.trim() || 'Root' }}</span>
+                      <span class="rule-badge muted">{{ isDividerDraft(entry) ? 'Divider' : 'Visible item' }}</span>
+                    </div>
+                    <div class="rule-meta">
+                      {{ entrySummary(entry) }}
+                    </div>
+                  </div>
+                  <span class="chevron">{{ isMenuEntryOpen(entry.id) ? '▲' : '▼' }}</span>
+                </div>
+
+                <div v-if="isMenuEntryOpen(entry.id)" class="rule-editor">
+                  <div class="editor-grid">
+                    <label class="field">
+                      <span>Menu group</span>
+                      <input v-model="entry.menuPath" type="text" placeholder="Research/Clippings" @input="onEdit" />
+                      <small class="field-help">Optional nested group path using <code>/</code>.</small>
+                      <small v-if="menuPathError(entry)" class="field-error">{{ menuPathError(entry) }}</small>
+                    </label>
+                  </div>
+
+                  <template v-if="!isDividerDraft(entry)">
+                    <label class="field">
+                      <span>Context menu label</span>
+                      <input v-model="entry.label" type="text" placeholder="Articles" @input="onEdit" />
+                      <small v-if="menuLabelError(entry)" class="field-error">{{ menuLabelError(entry) }}</small>
+                    </label>
+
+                    <label class="field">
+                      <span>Workflow</span>
+                      <div class="select-wrap">
+                        <select v-model="entry.workflowRuleId" @change="onEdit">
+                          <option :value="null">Select workflow</option>
+                          <option v-for="rule in workflowRules" :key="rule.id" :value="rule.id">
+                            {{ workflowTitle(rule) }}
+                          </option>
+                        </select>
+                        <span class="select-caret">▼</span>
+                      </div>
+                      <small v-if="linkedWorkflowError(entry)" class="field-error">{{ linkedWorkflowError(entry) }}</small>
+                    </label>
+                  </template>
+
+                  <div v-else class="divider-help">
+                    This item creates a non-clickable separator in the generated context menu.
+                  </div>
+
+                  <div class="rule-actions rule-actions--right-only">
+                    <div class="rule-actions__right">
+                      <button class="danger-button" type="button" @click="void removeMenuEntry(entry.id)">
+                        Remove item
+                      </button>
+                      <button class="primary-button" type="button" @click="void saveMenuEntry(entry.id)">
+                        Save item
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div class="list-add-actions">
+              <button class="add-more-button" type="button" @click="addMenuEntry()">
+                <span class="button-plus">+</span>
+                Add context menu item
+              </button>
+              <button class="add-more-button secondary-add" type="button" @click="addDividerEntry()">
+                Add divider
               </button>
             </div>
           </div>
@@ -863,7 +885,7 @@ function clearStatus(): void {
 
             <label class="checkbox-row">
               <input v-model="settings.notifyOnAutoRouteMatch" type="checkbox" @change="void persistSettings()" />
-              <span>Show a notification when <strong>Best matching rule</strong> finds a workflow rule.</span>
+              <span>Show a notification when <strong>Best matching workflow</strong> finds a workflow.</span>
             </label>
 
             <label class="field">
