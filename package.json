@@ -2,7 +2,7 @@
     "name": "save-in-mv3",
     "description": "Manifest V3 context-menu downloader with folder presets",
     "private": true,
-    "version": "0.1.0",
+    "version": "1.0.0",
     "type": "module",
     "scripts": {
         "dev": "wxt",
