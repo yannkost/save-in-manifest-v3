@@ -426,7 +426,6 @@ async function runTabWorkflow(
             menuEntries,
             workflowRules,
             true,
-            tab,
         );
 
         if (settings.closeTabAfterTabSave && typeof tab.id === "number") {
@@ -477,9 +476,9 @@ async function executeSelection(
     menuEntries: MenuEntry[],
     workflowRules: WorkflowRule[],
     isTabWorkflow = false,
-    sourceTab?: TabLike,
 ): Promise<void> {
     let workflowRule: WorkflowRule | undefined;
+    let selectedMenuEntry: MenuEntry | undefined;
     let matchResult: RuleMatchResult = { matches: false, captures: [] };
     const matchInput = createRuleMatchInput(prepared);
 
@@ -523,11 +522,18 @@ async function executeSelection(
         workflowRule = workflowRules.find(
             (value) => value.id === menuEntry.workflowRuleId,
         );
+        selectedMenuEntry = menuEntry;
     }
 
     if (!workflowRule) {
         await handleAutoRouteMiss(prepared, settings);
         return;
+    }
+
+    // Only an explicit menu-entry click updates the user-facing "Last used"
+    // shortcut; auto-match and tab workflows must not override it.
+    if (selectedMenuEntry) {
+        await saveLastUsedMenuEntry(toLastUsedMenuEntry(selectedMenuEntry));
     }
 
     if (menuId !== AUTO_ROUTE_MENU_ID || !matchResult.matches) {
@@ -541,12 +547,7 @@ async function executeSelection(
         );
     }
 
-    await startPreparedDownload(
-        prepared,
-        workflowRule,
-        matchResult.captures,
-        sourceTab,
-    );
+    await startPreparedDownload(prepared, workflowRule, matchResult.captures);
 }
 
 function prepareDownload(
@@ -685,7 +686,6 @@ async function startPreparedDownload(
     prepared: PreparedDownload,
     workflowRule: WorkflowRule,
     captures: string[],
-    sourceTab?: TabLike,
 ): Promise<void> {
     let finalPrepared = applyShortcutMode(prepared, workflowRule);
     finalPrepared = await applyDownloadTransport(finalPrepared);
@@ -716,12 +716,6 @@ async function startPreparedDownload(
         });
 
         pendingDownload.downloadId = downloadId;
-
-        // Update last used only for visible menu-entry-based manual saves is skipped here intentionally;
-        // tab workflows and auto-match shouldn't override the user-facing last-used menu entry.
-        if (sourceTab && typeof sourceTab.id === "number") {
-            // no-op placeholder for future per-workflow history
-        }
     } catch (error) {
         removePendingDownload(pendingDownload.requestId);
         await notify("Download failed", workflowRule.name);
@@ -1048,6 +1042,15 @@ async function cleanupLastUsedMenuEntry(
     if (!exists) {
         await saveLastUsedMenuEntry(null);
     }
+}
+
+function toLastUsedMenuEntry(entry: MenuEntry): LastUsedMenuEntry {
+    return {
+        id: entry.id,
+        label: entry.label,
+        menuPath: entry.menuPath,
+        workflowRuleId: entry.workflowRuleId ?? null,
+    };
 }
 
 function formatMenuTitle(label: string, menuPath?: string): string {
