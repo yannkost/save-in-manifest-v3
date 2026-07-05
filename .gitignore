@@ -17,6 +17,9 @@ web-ext.config.ts
 # Tooling
 .serena
 
+# Local notes
+permission.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
